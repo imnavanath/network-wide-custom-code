@@ -24,31 +24,18 @@ if(!class_exists('Multisite_Script_Class')){
 		 */
 		
 		function __construct() {
-			if( function_exists( 'switch_to_blog' ) ) {
-				$this->current_blog = get_current_blog_id();
-				switch_to_blog( 1 );
-				$this->multisite_script_option = get_option( 'multisite_script_option' );
-				switch_to_blog( $this->current_blog );
+			$this->current_blog = get_current_blog_id();
+			switch_to_blog( 1 );
+			$this->multisite_script_option = get_option( 'multisite_script_option' );
+			switch_to_blog( $this->current_blog );
 
-				add_action( 'network_admin_menu', array( $this, 'add_plugin_page' ), 9999 );
-				add_action( 'admin_init', array( $this, 'admin_init' ) );
-				add_action( 'wp_head', array( $this, 'wp_head' ) );
-				add_action( 'wp_footer', array( $this, 'wp_footer' ) );
-				add_action( 'init', array( $this, 'init' ) );
-				add_action( 'init', array( $this, 'admin_post_edit_options' ) );
-			} else {
-	    		add_action( 'admin_notices', array( $this, 'error_notice' ) );
-	    	}
-		}
-
-		/*
-		 * Function Name: error_notice
-		 * Function Description: Admin notice
-		 */
-
-		public function error_notice() {
-			$msg = '<strong>Network Wide Custom Code</strong> works for WordPress Multisite setup only.';
-			echo"<div class=\"error\"> <p>" . $msg . "</p></div>"; 
+			add_action( 'network_admin_menu', array( $this, 'add_plugin_page' ), 9999 );
+			add_action( 'admin_init', array( $this, 'admin_init' ) );
+			add_action( 'wp_head', array( $this, 'wp_head' ) );
+			add_action( '
+				', array( $this, 'wp_footer' ) );
+			add_action( 'init', array( $this, 'init' ) );
+			add_action( 'init', array( $this, 'admin_post_edit_options' ) );
 		}
 
 		public function admin_post_edit_options(){
@@ -72,9 +59,15 @@ if(!class_exists('Multisite_Script_Class')){
 
 					add_action( 'wp_head', array( $this, 'wp_head' ) );
 					add_action( 'wp_footer', array( $this, 'wp_footer' ) );
+
+					add_action( 'next_body_top', array( $this, 'after_exact_body' ) );
+					add_action( 'after_body', array( $this, 'after_exact_body' ) );
 				}
 			}
 			switch_to_blog( $this->current_blog );
+		}
+		public function after_exact_body() {
+			echo stripslashes($this->multisite_script_option['after_exact_body']);
 		}
 
 		/*
@@ -83,7 +76,7 @@ if(!class_exists('Multisite_Script_Class')){
 		 */
 
 		public function wp_head() {
-			echo $this->multisite_script_option['header_script'];
+			echo stripslashes($this->multisite_script_option['header_script']);
 		}
 
 		/*
@@ -92,7 +85,7 @@ if(!class_exists('Multisite_Script_Class')){
 		 */
 
 		public function wp_footer() {
-			echo $this->multisite_script_option['footer_script'];
+			echo stripslashes($this->multisite_script_option['footer_script']);
 		}
 
 		/*
@@ -115,7 +108,13 @@ if(!class_exists('Multisite_Script_Class')){
 	            array( $this, 'print_section_info' ), // Callback
 	            'multisite-script-admin' // Page
 	        );
-
+	        add_settings_field(
+	            'after_exact_body', // ID
+	            'These scripts will be printed immediate the <code>&lt;body&gt;</code> section.', // Title
+	            array( $this, 'after_body_script_callback' ), // Callback
+	            'multisite-script-admin', // Page
+	            'multisite_script_setting' // Section
+	        );
 	        add_settings_field(
 	            'header_script', // ID
 	            'These scripts will be printed to the <code>&lt;head&gt;</code> section.', // Title
@@ -187,10 +186,13 @@ if(!class_exists('Multisite_Script_Class')){
 
 	        $new_input = array();
 	        if( isset( $input['header_script'] ) )
-	            $new_input['header_script'] = $input['header_script'];
+	            $new_input['header_script'] = stripslashes($input['header_script']);
+
+	        if( isset( $input['after_exact_body'] ) )
+	            $new_input['after_exact_body'] = stripslashes($input['after_exact_body']);	        
 
 			if( isset( $input['footer_script'] ) )
-	            $new_input['footer_script'] = $input['footer_script'];
+	            $new_input['footer_script'] = stripslashes($input['footer_script']);
 
 	        return $new_input;
 	    }
@@ -204,13 +206,24 @@ if(!class_exists('Multisite_Script_Class')){
 	        //Nothing to do here
 	    }
 
+	   
+	    /*
+	     * Callback function for Header Script input
+	     */
+	    public function after_body_script_callback() {
+	    	$script = ( isset( $this->multisite_script_option['after_exact_body'] ) ) ? stripslashes($this->multisite_script_option['after_exact_body']) : '';
+	        printf(
+	        	'<textarea id="after_exact_body" name="multisite_script_option[after_exact_body]" rows="4" cols="50" placeholder="Add your script here.">%s</textarea><br/>Note: You need to add action "after_body" exact below the <code>&lt;body&gt;</code>', $script
+	        );
+	    }
+
 	    /*
 	     * Callback function for Header Script input
 	     */
 	    public function header_script_callback() {
-	    	$script = ( isset( $this->multisite_script_option['header_script'] ) ) ? $this->multisite_script_option['header_script'] : '';
+	    	$script = ( isset( $this->multisite_script_option['header_script'] ) ) ? stripslashes($this->multisite_script_option['header_script']) : '';
 	        printf(
-	        	'<textarea id="header_script" name="multisite_script_option[header_script]" rows="4" cols="50" placeholder="Add your script here.">%s</textarea>', stripslashes($script)
+	        	'<textarea id="header_script" name="multisite_script_option[header_script]" rows="4" cols="50" placeholder="Add your script here.">%s</textarea>', $script
 	        );
 	    }
 
@@ -218,9 +231,9 @@ if(!class_exists('Multisite_Script_Class')){
 	     * Callback function for Footer Script input
 	     */
 	    public function footer_script_callback() {
-	    	$script = ( isset( $this->multisite_script_option['footer_script'] ) ) ? $this->multisite_script_option['footer_script'] : '';
+	    	$script = ( isset( $this->multisite_script_option['footer_script'] ) ) ? stripslashes($this->multisite_script_option['footer_script']) : '';
 	        printf(
-				'<textarea id="footer_script" name="multisite_script_option[footer_script]" rows="4" cols="50" placeholder="Add your script here.">%s</textarea>', stripslashes($script)
+				'<textarea id="footer_script" name="multisite_script_option[footer_script]" rows="4" cols="50" placeholder="Add your script here.">%s</textarea>', $script
 	        );
 	    }
 	}
